@@ -5,8 +5,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy everything explicitly
-COPY main.py agent.py tools.py api.py cleaning.py index.html ./
+# Copy ALL files from the build context
+COPY . .
+
+# Confirm files are present at build time
+RUN ls -la /app/
 
 EXPOSE 8000
 
