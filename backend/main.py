@@ -9,15 +9,18 @@ load_dotenv()
 from api import test_connection
 from agent import run_agent
 
-app = Flask(__name__, static_folder=".", static_url_path="")
+# __file__ is /app/main.py so this gives us /app
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+app = Flask(__name__, static_folder=BASE_DIR, static_url_path="")
 CORS(app)
+
+# In-memory session store
+sessions = {}
 
 @app.route("/")
 def index():
-    return send_from_directory(".", "index.html")
-
-# In-memory session store (keyed by session_id)
-sessions = {}
+    return send_from_directory(BASE_DIR, "index.html")
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -25,7 +28,6 @@ def health():
 
 @app.route("/api/status", methods=["GET"])
 def status():
-    """Check Monday.com connection status."""
     conn = test_connection()
     return jsonify({
         "monday_connected": conn["ok"],
@@ -37,10 +39,6 @@ def status():
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
-    """
-    POST body: { "message": "...", "session_id": "..." }
-    Returns: { "answer": "...", "trace": [...], "session_id": "..." }
-    """
     body = request.get_json()
     if not body or "message" not in body:
         return jsonify({"error": "Missing 'message' field"}), 400
@@ -51,7 +49,6 @@ def chat():
     if not user_message:
         return jsonify({"error": "Empty message"}), 400
 
-    # Load or init conversation history for this session
     if session_id not in sessions:
         sessions[session_id] = []
 
@@ -60,7 +57,6 @@ def chat():
     try:
         answer, updated_history, traces = run_agent(user_message, history)
         sessions[session_id] = updated_history
-
         return jsonify({
             "answer": answer,
             "trace": traces,
@@ -71,7 +67,6 @@ def chat():
 
 @app.route("/api/reset", methods=["POST"])
 def reset():
-    """Reset conversation history for a session."""
     body = request.get_json() or {}
     session_id = body.get("session_id", "default")
     sessions[session_id] = []
