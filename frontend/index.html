@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Monday BI Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:        #0a0c10;
+    --surface:   #111318;
+    --border:    #1e2128;
+    --border2:   #2a2f3a;
+    --accent:    #4f8aff;
+    --accent2:   #00d4aa;
+    --warn:      #f59e0b;
+    --err:       #f87171;
+    --text:      #e8eaf0;
+    --muted:     #6b7280;
+    --user-bg:   #16213e;
+    --agent-bg:  #111318;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── HEADER ───────────────────────────────────── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .logo-text {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+
+  .logo-text span { color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 100px;
+    border: 1px solid var(--border2);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg);
+    transition: all 0.3s;
+  }
+
+  .status-pill.connected { border-color: var(--accent2); color: var(--accent2); }
+  .status-pill.error { border-color: var(--err); color: var(--err); }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    animation: pulse 2s infinite;
+  }
+  .status-pill.connected .dot { background: var(--accent2); }
+  .status-pill.error .dot { background: var(--err); animation: none; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── MAIN LAYOUT ──────────────────────────────── */
+  .app-body {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── CHAT PANEL ───────────────────────────────── */
+  .chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--border);
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    scroll-behavior: smooth;
+  }
+
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 4px; }
+
+  /* Welcome state */
+  .welcome {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px;
+    gap: 20px;
+    color: var(--muted);
+  }
+
+  .welcome h2 {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: -1px;
+  }
+
+  .welcome p { font-size: 14px; line-height: 1.7; max-width: 420px; }
+
+  .sample-queries {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .sample-q {
+    padding: 8px 16px;
+    border: 1px solid var(--border2);
+    border-radius: 100px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+  }
+
+  .sample-q:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(79,138,255,0.05);
+  }
+
+  /* Message bubbles */
+  .msg {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    animation: fadeUp 0.3s ease;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-label {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 4px;
+  }
+
+  .msg.user .msg-label { color: var(--accent); }
+  .msg.agent .msg-label { color: var(--accent2); }
+
+  .msg-bubble {
+    padding: 14px 18px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.7;
+    border: 1px solid var(--border);
+    max-width: 100%;
+  }
+
+  .msg.user .msg-bubble {
+    background: var(--user-bg);
+    border-color: rgba(79,138,255,0.2);
+    align-self: flex-end;
+    max-width: 80%;
+  }
+
+  .msg.agent .msg-bubble {
+    background: var(--agent-bg);
+    border-color: var(--border2);
+  }
+
+  .msg-bubble p { margin-bottom: 8px; }
+  .msg-bubble p:last-child { margin-bottom: 0; }
+  .msg-bubble strong { color: var(--accent2); font-weight: 600; }
+  .msg-bubble em { color: var(--warn); font-style: normal; font-family: 'DM Mono', monospace; font-size: 12px; }
+
+  /* Thinking indicator */
+  .thinking {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    background: var(--agent-bg);
+    border: 1px solid var(--border2);
+    font-size: 13px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    width: fit-content;
+  }
+
+  .thinking-dots { display: flex; gap: 4px; }
+  .thinking-dots span {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: blink 1.4s infinite;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0.2} 40%{opacity:1} }
+
+  /* ── INPUT AREA ───────────────────────────────── */
+  .input-area {
+    padding: 20px 32px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  textarea {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    padding: 12px 16px;
+    resize: none;
+    min-height: 48px;
+    max-height: 140px;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.5;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); }
+
+  .btn-send {
+    width: 48px; height: 48px;
+    border-radius: 10px;
+    background: var(--accent);
+    border: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: white;
+    font-size: 18px;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .btn-send:hover { background: #3d76f0; transform: translateY(-1px); }
+  .btn-send:disabled { background: var(--border2); cursor: not-allowed; transform: none; }
+
+  .input-hint {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .btn-reset {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: color 0.2s;
+  }
+  .btn-reset:hover { color: var(--err); }
+
+  /* ── TRACE PANEL ──────────────────────────────── */
+  .trace-panel {
+    width: 340px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .trace-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .trace-header h3 {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .trace-count {
+    margin-left: auto;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    background: var(--border);
+    padding: 2px 8px;
+    border-radius: 100px;
+  }
+
+  .trace-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .trace-body::-webkit-scrollbar { width: 3px; }
+  .trace-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  .trace-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 10px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .trace-empty svg { opacity: 0.3; }
+
+  .trace-event {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border-left: 3px solid transparent;
+    background: var(--bg);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    animation: fadeUp 0.2s ease;
+  }
+
+  .trace-event.tool_call   { border-color: var(--accent); }
+  .trace-event.api_call    { border-color: var(--accent2); }
+  .trace-event.api_response{ border-color: var(--accent2); }
+  .trace-event.processing  { border-color: var(--warn); }
+  .trace-event.error       { border-color: var(--err); }
+
+  .trace-type {
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .trace-event.tool_call   .trace-type { color: var(--accent); }
+  .trace-event.api_call    .trace-type { color: var(--accent2); }
+  .trace-event.api_response .trace-type { color: var(--accent2); }
+  .trace-event.processing  .trace-type { color: var(--warn); }
+  .trace-event.error       .trace-type { color: var(--err); }
+
+  .trace-msg { color: var(--text); line-height: 1.4; }
+  .trace-detail {
+    margin-top: 5px;
+    color: var(--muted);
+    line-height: 1.4;
+    word-break: break-all;
+    font-size: 10px;
+  }
+
+  .trace-ts {
+    margin-top: 4px;
+    font-size: 9px;
+    color: var(--muted);
+    opacity: 0.6;
+  }
+
+  @media (max-width: 768px) {
+    .trace-panel { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">📊</div>
+    <div class="logo-text">Monday <span>BI</span> Agent</div>
+  </div>
+  <div class="status-pill" id="statusPill">
+    <div class="dot"></div>
+    <span id="statusText">Connecting...</span>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="app-body">
+
+  <!-- CHAT -->
+  <div class="chat-panel">
+    <div class="messages" id="messages">
+      <div class="welcome" id="welcome">
+        <div style="font-size:48px">🧠</div>
+        <h2>Ask your data anything.</h2>
+        <p>Live queries against your Monday.com Deals and Work Orders boards. Every answer is fresh — no caching.</p>
+        <div class="sample-queries">
+          <div class="sample-q" onclick="sendSample(this)">How's our pipeline looking?</div>
+          <div class="sample-q" onclick="sendSample(this)">Top sectors by deal value</div>
+          <div class="sample-q" onclick="sendSample(this)">Which deals are stuck in negotiation?</div>
+          <div class="sample-q" onclick="sendSample(this)">Total receivables outstanding</div>
+          <div class="sample-q" onclick="sendSample(this)">Mining sector performance</div>
+          <div class="sample-q" onclick="sendSample(this)">Work orders at risk of delay</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <div class="input-row">
+        <textarea
+          id="input"
+          placeholder="Ask a business question..."
+          rows="1"
+          onkeydown="handleKey(event)"
+          oninput="autoResize(this)"
+        ></textarea>
+        <button class="btn-send" id="sendBtn" onclick="sendMessage()">↑</button>
+      </div>
+      <div class="input-hint">
+        <span>Enter to send · Shift+Enter for newline</span>
+        <button class="btn-reset" onclick="resetChat()">↺ Reset</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRACE -->
+  <div class="trace-panel">
+    <div class="trace-header">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <h3>Tool Call Trace</h3>
+      <span class="trace-count" id="traceCount">0 events</span>
+    </div>
+    <div class="trace-body" id="traceBody">
+      <div class="trace-empty">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+        </svg>
+        <span>API calls will appear<br/>here in real time</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API_BASE = window.location.origin;  // same origin in production
+// For local dev, change to: const API_BASE = "http://localhost:8000";
+
+let sessionId = "session_" + Math.random().toString(36).slice(2);
+let isLoading = false;
+let traceCount = 0;
+
+// ── STATUS CHECK ──────────────────────────────────────────────────────────
+async function checkStatus() {
+  try {
+    const r = await fetch(`${API_BASE}/api/status`);
+    const d = await r.json();
+    const pill = document.getElementById("statusPill");
+    const txt  = document.getElementById("statusText");
+    if (d.monday_connected) {
+      pill.className = "status-pill connected";
+      txt.textContent = `Connected · ${d.monday_user || 'Monday.com'}`;
+    } else {
+      pill.className = "status-pill error";
+      txt.textContent = "Connection failed";
+    }
+  } catch {
+    const pill = document.getElementById("statusPill");
+    pill.className = "status-pill error";
+    document.getElementById("statusText").textContent = "Backend offline";
+  }
+}
+checkStatus();
+
+// ── SEND MESSAGE ──────────────────────────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById("input");
+  const msg = input.value.trim();
+  if (!msg || isLoading) return;
+
+  // Hide welcome
+  const welcome = document.getElementById("welcome");
+  if (welcome) welcome.remove();
+
+  appendMessage("user", msg);
+  input.value = "";
+  autoResize(input);
+
+  setLoading(true);
+  const thinking = appendThinking();
+
+  // Clear trace for new query
+  clearTrace();
+
+  try {
+    const r = await fetch(`${API_BASE}/api/chat`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ message: msg, session_id: sessionId })
+    });
+    const d = await r.json();
+
+    thinking.remove();
+
+    if (d.error) {
+      appendMessage("agent", `⚠️ Error: ${d.error}`);
+    } else {
+      appendMessage("agent", d.answer);
+      if (d.trace && d.trace.length > 0) {
+        renderTrace(d.trace);
+      }
+    }
+  } catch (e) {
+    thinking.remove();
+    appendMessage("agent", "⚠️ Could not reach the backend. Is it running?");
+  }
+
+  setLoading(false);
+}
+
+function sendSample(el) {
+  document.getElementById("input").value = el.textContent;
+  sendMessage();
+}
+
+function handleKey(e) {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 140) + "px";
+}
+
+// ── RESET ─────────────────────────────────────────────────────────────────
+async function resetChat() {
+  await fetch(`${API_BASE}/api/reset`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ session_id: sessionId })
+  });
+  const msgs = document.getElementById("messages");
+  msgs.innerHTML = `
+    <div class="welcome" id="welcome">
+      <div style="font-size:48px">🧠</div>
+      <h2>Ask your data anything.</h2>
+      <p>Live queries against your Monday.com Deals and Work Orders boards. Every answer is fresh — no caching.</p>
+      <div class="sample-queries">
+        <div class="sample-q" onclick="sendSample(this)">How's our pipeline looking?</div>
+        <div class="sample-q" onclick="sendSample(this)">Top sectors by deal value</div>
+        <div class="sample-q" onclick="sendSample(this)">Which deals are stuck in negotiation?</div>
+        <div class="sample-q" onclick="sendSample(this)">Total receivables outstanding</div>
+        <div class="sample-q" onclick="sendSample(this)">Mining sector performance</div>
+        <div class="sample-q" onclick="sendSample(this)">Work orders at risk of delay</div>
+      </div>
+    </div>`;
+  clearTrace();
+}
+
+// ── UI HELPERS ────────────────────────────────────────────────────────────
+function appendMessage(role, text) {
+  const msgs = document.getElementById("messages");
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+  div.innerHTML = `
+    <div class="msg-label">${role === "user" ? "You" : "BI Agent"}</div>
+    <div class="msg-bubble">${formatText(text)}</div>
+  `;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function appendThinking() {
+  const msgs = document.getElementById("messages");
+  const div = document.createElement("div");
+  div.className = "msg agent";
+  div.innerHTML = `
+    <div class="msg-label">BI Agent</div>
+    <div class="thinking">
+      <div class="thinking-dots"><span></span><span></span><span></span></div>
+      Querying live data...
+    </div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+function setLoading(state) {
+  isLoading = state;
+  document.getElementById("sendBtn").disabled = state;
+  document.getElementById("input").disabled = state;
+}
+
+function formatText(text) {
+  // Basic markdown-ish formatting
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`(.*?)`/g, '<em>$1</em>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/\n/g, '<br/>')
+    .replace(/^/, '<p>')
+    .replace(/$/, '</p>');
+}
+
+// ── TRACE ─────────────────────────────────────────────────────────────────
+function clearTrace() {
+  traceCount = 0;
+  document.getElementById("traceCount").textContent = "0 events";
+  document.getElementById("traceBody").innerHTML = `
+    <div class="trace-empty">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/>
+      </svg>
+      <span>API calls will appear<br/>here in real time</span>
+    </div>`;
+}
+
+function renderTrace(events) {
+  const body = document.getElementById("traceBody");
+  // Clear empty state
+  const empty = body.querySelector(".trace-empty");
+  if (empty) empty.remove();
+
+  const typeLabels = {
+    tool_call:    "🛠 Tool Call",
+    api_call:     "🌐 API Call",
+    api_response: "✓ API Response",
+    processing:   "⚙ Processing",
+    error:        "✗ Error"
+  };
+
+  for (const ev of events) {
+    traceCount++;
+    const now = new Date().toLocaleTimeString();
+    const el = document.createElement("div");
+    el.className = `trace-event ${ev.type}`;
+    el.innerHTML = `
+      <div class="trace-type">${typeLabels[ev.type] || ev.type}</div>
+      <div class="trace-msg">${ev.message}</div>
+      ${ev.detail ? `<div class="trace-detail">${ev.detail}</div>` : ""}
+      <div class="trace-ts">${now}</div>
+    `;
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  document.getElementById("traceCount").textContent = `${traceCount} events`;
+}
+</script>
+</body>
+</html>
