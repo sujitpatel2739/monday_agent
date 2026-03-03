@@ -5,7 +5,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy everything explicitly
+COPY main.py agent.py tools.py api.py cleaning.py index.html ./
 
 EXPOSE 8000
 
