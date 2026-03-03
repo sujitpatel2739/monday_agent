@@ -6,9 +6,7 @@ A conversational AI agent that answers founder-level business intelligence queri
 
 ## Live Demo
 
-> **App:** `https://your-app.up.railway.app`
-> **Deals Board:** `https://your-company.monday.com/boards/DEALS_BOARD_ID`
-> **Work Orders Board:** `https://your-company.monday.com/boards/WORK_ORDERS_BOARD_ID`
+> **App:** `[https://your-app.up.railway.app](https://mondayagent-production.up.railway.app/)`
 
 ---
 
